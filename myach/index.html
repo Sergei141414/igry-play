@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="build" content="2026-10-21T11:06:39.468Z">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Мяч к воротам</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #12324a; --bg2: #0c2537; --panel: #1b4566; --text: #f4f8fb; --muted: #a9c1d4;
+    --accent: #ffd23f; --accent-text: #2a2000; --btn: #2a5d84; --btn-hi: #3a74a2; --danger: #ff7a1a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 16px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    overscroll-behavior: none; touch-action: none;
+  }
+  body { position: fixed; inset: 0; }
+  [hidden] { display: none !important; }
+  button {
+    font: inherit; color: var(--text); background: var(--btn); border: 0; border-radius: 14px;
+    padding: 0.7em 1em; min-height: 46px; cursor: pointer; touch-action: manipulation;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+  }
+  button:hover:not(:disabled) { background: var(--btn-hi); }
+  button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.25); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); color: var(--accent-text); font-weight: 700; }
+  button small { display: block; font-size: 0.7em; opacity: 0.8; font-weight: 400; }
+
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+  /* Меню */
+  #menu { align-items: center; justify-content: center; gap: 14px; text-align: center;
+    background: radial-gradient(circle at 50% 35%, #2f8a43 0, #1f6a33 35%, var(--bg) 75%); }
+  #menu h1 { margin: 0; font-size: clamp(30px, 8vmin, 64px); letter-spacing: 0.5px; text-shadow: 0 3px 0 rgba(0,0,0,0.3); }
+  #menu-ball { width: clamp(70px, 18vmin, 140px); height: clamp(70px, 18vmin, 140px); }
+  #menu p { margin: 0 16px; color: var(--muted); max-width: 420px; }
+  #menu .actions { display: flex; flex-direction: column; gap: 10px; width: min(300px, 80vw); }
+  #btn-play { font-size: 1.3em; min-height: 58px; }
+
+  /* Уровни */
+  #levels header { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg2); }
+  #levels h2 { margin: 0; font-size: 1.2em; }
+  #levels-list { flex: 1; overflow-y: auto; padding: 6px 14px 20px; touch-action: pan-y; overscroll-behavior: contain; }
+  #levels h3 { margin: 16px 0 8px; font-size: 1em; color: var(--muted); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
+  .lvl { padding: 6px 0; min-height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .lvl span { font-weight: 700; }
+  .lvl small { color: var(--accent); letter-spacing: 1px; font-size: 0.75em; }
+
+  /* Уровень */
+  #game { background: var(--bg); }
+  .hud { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg2); }
+  .hud .title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .hud .title b { font-size: 1.05em; }
+  .hud .title span { color: var(--accent); font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #moves { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  #btn-pause, #levels-back { min-width: 46px; padding: 0.5em; font-weight: 700; }
+  #board { position: relative; flex: 1; min-height: 0; }
+  #cv { position: absolute; inset: 0; display: block; }
+  #caption { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 0.85em; color: var(--text);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8); pointer-events: none; padding: 0 10px; }
+  .bar { display: flex; gap: 8px; padding: 8px 12px; background: var(--bg2); justify-content: center; }
+  .bar button { flex: 1; max-width: 220px; padding: 0.5em 0.4em; font-size: 0.95em; }
+  #btn-hint { background: #6b4bd6; }
+  #btn-hint:hover { background: #7c5ee6; }
+
+  /* Окна поверх уровня */
+  .overlay { position: absolute; inset: 0; background: rgba(5,15,25,0.72); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 5; }
+  .card { background: var(--panel); border-radius: 20px; padding: 20px; width: min(360px, 100%); max-height: 100%; overflow: auto;
+    text-align: center; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+  .card h2 { margin: 0; font-size: 1.5em; }
+  .card p { margin: 0; color: var(--muted); }
+  #win-stars { font-size: 2.6em; color: var(--accent); letter-spacing: 6px; line-height: 1; }
+  #intro-cv { align-self: center; border-radius: 10px; }
+  .card button.quiet { background: transparent; box-shadow: none; color: var(--muted); border: 1px solid rgba(255,255,255,0.2); }
+  /* Окно победы — панелью снизу и с лёгким затемнением: мяч в сетке остаётся виден. */
+  #ov-win { align-items: flex-end; background: rgba(5,15,25,0.3); }
+  #ov-win .card { gap: 8px; }
+  .lvl.locked span { opacity: 0.55; }
+  .lvl.locked small { color: var(--muted); }
+  .lvl.current { outline: 3px solid var(--accent); outline-offset: 1px; }
+  #levels h3:first-child { margin-top: 10px; }
+
+  #toast { position: absolute; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 10;
+    background: rgba(0,0,0,0.85); color: #fff; padding: 10px 16px; border-radius: 12px; max-width: 90vw; text-align: center; font-size: 0.95em; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--muted); z-index: 20; }
+
+  /* Телефон боком: поле на всю высоту, заголовок и кнопки — колонкой справа. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    #game { display: grid; grid-template-columns: 1fr minmax(200px, 30%); grid-template-rows: auto 1fr; grid-template-areas: 'board hud' 'board bar'; }
+    #board { grid-area: board; }
+    .hud { grid-area: hud; flex-wrap: wrap; align-items: flex-start; }
+    .hud .title span { white-space: normal; overflow: visible; }
+    /* Счётчик ходов — отдельной строкой под заголовком, иначе в узкой колонке не помещается «Уровень 150». */
+    .hud #moves { flex-basis: 100%; padding-left: 56px; }
+    .bar { grid-area: bar; flex-direction: column; justify-content: flex-end; }
+    .bar button { max-width: none; flex: 0 0 auto; }
+  }
+  @media (max-height: 420px) {
+    .hud, .bar { padding-top: 4px; padding-bottom: 4px; }
+    button { min-height: 40px; }
+    #menu { gap: 8px; }
+  }
+</style>
+
+</head>
+<body>
+<div id="loading">…</div>
+
+<section id="menu" class="screen" hidden>
+  <canvas id="menu-ball" aria-hidden="true"></canvas>
+  <h1 id="menu-title"></h1>
+  <p id="menu-tagline"></p>
+  <div class="actions">
+    <button id="btn-play" class="primary"></button>
+    <button id="btn-levels"></button>
+    <button id="btn-sound"></button>
+  </div>
+  <p id="menu-stars"></p>
+  <p id="menu-controls"></p>
+</section>
+
+<section id="levels" class="screen" hidden>
+  <header><button id="levels-back">←</button><h2 id="levels-title"></h2></header>
+  <div id="levels-list"></div>
+</section>
+
+<section id="game" class="screen" hidden>
+  <header class="hud">
+    <button id="btn-pause">❚❚</button>
+    <div class="title"><b id="lvl-title"></b><span id="lvl-target"></span></div>
+    <div id="moves"></div>
+  </header>
+  <div id="board"><canvas id="cv"></canvas><div id="caption"></div></div>
+  <footer class="bar">
+    <button id="btn-undo"></button>
+    <button id="btn-restart"></button>
+    <button id="btn-hint"></button>
+  </footer>
+
+  <div id="ov-intro" class="overlay" hidden><div class="card">
+    <h2 id="intro-title"></h2><canvas id="intro-cv" width="180" height="120"></canvas><p id="intro-body"></p>
+    <button id="intro-ok" class="primary"></button>
+  </div></div>
+  <div id="ov-win" class="overlay" hidden><div class="card">
+    <h2 id="win-title"></h2><div id="win-stars"></div><p id="win-result"></p>
+    <button id="win-next" class="primary"></button><button id="win-restart"></button><button id="win-levels"></button>
+  </div></div>
+  <div id="ov-pause" class="overlay" hidden><div class="card">
+    <h2 id="p-title"></h2>
+    <button id="p-resume" class="primary"></button>
+    <button id="p-sound"></button><button id="p-levels"></button><button id="p-menu"></button>
+    <button id="p-skip" class="quiet"></button>
+  </div></div>
+</section>
+
+<div id="toast" hidden></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

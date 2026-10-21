@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="build" content="2026-10-21T11:06:39.021Z">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Счётный зоопарк</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #fff8ec; --panel: #ffffff; --text: #2d2a3e; --muted: #7a7590; --line: #ece4d6;
+    --accent: #ff8a3d; --accent-text: #ffffff; --ok: #2fb35a; --bad: #e8573c; --key: #f3ecff; --key-hi: #e6dbff; --key-text: #3b2f6b;
+    --shadow: 0 4px 0 rgba(60,40,90,0.18);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 17px/1.3 "Trebuchet MS", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; touch-action: none;
+  }
+  body { position: fixed; inset: 0; }
+  [hidden] { display: none !important; }
+  button {
+    font: inherit; font-weight: 700; color: var(--text); background: #fff; border: 2px solid var(--line); border-radius: 16px;
+    padding: 0.6em 1em; min-height: 48px; cursor: pointer; touch-action: manipulation; box-shadow: var(--shadow);
+  }
+  button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(60,40,90,0.18); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible { outline: 3px solid #4fb3ff; outline-offset: 2px; }
+  button.primary { background: var(--accent); border-color: #e9732a; color: var(--accent-text); }
+  button.ad { background: transparent; border: 2px dashed #b9a6e8; color: #6b55b0; box-shadow: none; font-weight: 600; font-size: 0.9em; min-height: 42px; }
+  button small { display: block; font-size: 0.68em; font-weight: 400; opacity: 0.9; }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  canvas { display: block; }
+
+  /* Меню: поляна во весь экран, кнопки поверх */
+  #menu { justify-content: flex-end; }
+  #menu-meadow { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #menu .front { position: relative; margin: auto auto 6vh; width: min(360px, 88vw); display: flex; flex-direction: column; gap: 10px; text-align: center; }
+  #menu h1 { margin: 0 0 2px; font-size: clamp(30px, 8vmin, 54px); color: #fff; text-shadow: 0 3px 0 #e9732a, 0 6px 14px rgba(0,0,0,0.25); }
+  #menu p { margin: 0 0 6px; color: #234; font-weight: 600; background: rgba(255,255,255,0.75); border-radius: 12px; padding: 6px 10px; }
+  #btn-play { font-size: 1.35em; min-height: 62px; }
+  #menu-topic { margin-top: -4px; color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+  #menu .row { display: flex; gap: 10px; }
+  #menu .row button { flex: 1; }
+
+  header.bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border-bottom: 2px solid var(--line); }
+  header.bar h2 { margin: 0; font-size: 1.15em; flex: 1; min-width: 0; }
+  .back { min-width: 48px; padding: 0.4em; }
+  .scroll { flex: 1; overflow-y: auto; padding: 12px 14px 24px; touch-action: pan-y; overscroll-behavior: contain; }
+
+  /* Темы */
+  #topic-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+  .topic { text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 12px 14px; min-height: 76px; }
+  .topic b { font-size: 1.05em; }
+  .topic .sample { grid-row: span 2; align-self: center; font-size: 1.25em; color: var(--accent); white-space: nowrap; }
+  .topic .lvl { font-weight: 400; color: var(--muted); font-size: 0.85em; }
+
+  /* Игра */
+  #play { background: var(--bg); }
+  #play .hud { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border-bottom: 2px solid var(--line); }
+  #play .hud .title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  #play .hud .title b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #play .hud .title span { color: var(--muted); font-size: 0.8em; }
+  #dots { display: flex; gap: 4px; }
+  #dots { gap: 5px; }
+  #dots i { width: 16px; height: 16px; border-radius: 50%; background: var(--line); display: block; transition: background 0.3s, transform 0.3s; }
+  @media (max-width: 480px) { #dots { gap: 3px; } #dots i { width: 12px; height: 12px; } }
+  #dots i.on { background: var(--accent); transform: scale(1.15); }
+  #dots i.last { box-shadow: 0 0 0 2px #9b6bff; }
+  #play-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #meadow-box { position: relative; flex: 1 1 32%; min-height: 120px; }
+  #meadow { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #panel { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 12px 12px; background: var(--bg); }
+  #problem { font-size: clamp(34px, 9vmin, 64px); font-weight: 800; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 0.25em; min-height: 1.4em; font-variant-numeric: tabular-nums; }
+  #problem .box { min-width: 1.6em; padding: 0 0.15em; border-radius: 12px; border: 3px dashed #c9bfe8; color: #9b6bff; text-align: center; background: #fff; }
+  #problem .box.filled { border-style: solid; color: var(--text); }
+  #problem.ok .box { border-color: var(--ok); color: var(--ok); }
+  #problem.reveal .box { border-color: var(--accent); color: var(--accent); }
+  #problem.shake { animation: shake 0.35s; }
+  @keyframes shake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+  /* Столбик: разряды в клетках, ответ пишется справа налево */
+  .col { display: grid; gap: 2px 0; font-size: 0.85em; }
+  .col .r { display: grid; grid-auto-flow: column; justify-content: end; }
+  .col .r span { width: 0.85em; text-align: center; }
+  .col .op { position: absolute; margin-left: -1em; }
+  .col .line { border-top: 4px solid var(--text); margin: 2px 0; }
+  .col .ans span { border-bottom: 3px dashed #c9bfe8; color: #9b6bff; margin-left: 2px; }
+  .col .ans span.cur { background: #f1eaff; border-bottom-style: solid; border-bottom-color: #9b6bff; }
+  .col .ans span.full { color: var(--text); border-bottom-style: solid; }
+  #problem.ok .col .ans span { color: var(--ok); border-color: var(--ok); }
+  #problem.reveal .col .ans span { color: var(--accent); border-color: var(--accent); }
+  #hint { white-space: pre-line; letter-spacing: 1px; min-height: 1.3em; font-size: 1.05em; font-weight: 600; color: var(--text); text-align: center; max-width: 520px; }
+  #hint.bad { color: var(--bad); font-weight: 700; }
+  #keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(380px, 100%); }
+  #keypad button { min-height: clamp(48px, 7.5vh, 66px); font-size: 1.5em; background: var(--key); border-color: var(--key-hi); color: var(--key-text); padding: 0; }
+  #keypad button.ok { background: var(--ok); border-color: #26984b; color: #fff; font-size: 1.15em; }
+  #keypad button.del { font-size: 1.15em; }
+  #banner { position: absolute; left: 50%; top: 18%; transform: translate(-50%, 0) scale(0.6); opacity: 0; pointer-events: none; z-index: 4;
+    font-size: clamp(22px, 6vmin, 40px); font-weight: 800; color: #fff; background: #9b6bff; padding: 8px 18px; border-radius: 18px; white-space: nowrap;
+    box-shadow: 0 6px 0 #7b4fe0, 0 10px 24px rgba(0,0,0,0.2); transition: opacity 0.25s, transform 0.35s cubic-bezier(.3,1.6,.5,1); max-width: 94vw; overflow: hidden; text-overflow: ellipsis; }
+  #banner.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  #banner.gold { background: #ffb800; box-shadow: 0 6px 0 #d99a00, 0 10px 24px rgba(0,0,0,0.2); }
+
+  /* Окна */
+  .overlay { position: absolute; inset: 0; background: rgba(40,30,70,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 6; }
+  .card { background: #fff; border-radius: 24px; padding: 20px; width: min(380px, 100%); max-height: 100%; overflow: auto; text-align: center;
+    display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 34px rgba(0,0,0,0.25); }
+  .card h2 { margin: 0; font-size: 1.5em; }
+  .card p { margin: 0; color: var(--muted); }
+  #end-animal { align-self: center; width: 150px; height: 150px; }
+
+  /* Зоопарк */
+  #zoo h3 { margin: 14px 0 8px; color: var(--muted); font-size: 0.95em; }
+  #zoo .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+  .tile { background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 4px 4px 6px; text-align: center; font-size: 0.8em; font-weight: 700; }
+  .tile canvas { width: 100%; aspect-ratio: 1; }
+  .tile.locked { color: var(--muted); font-weight: 400; }
+  #zoo-hint { color: var(--text); margin: 0; font-weight: 600; }
+  .zoo-note { color: var(--muted); font-size: 0.85em; margin: -4px 0 6px; }
+  .zoo-foot { padding: 8px 14px 12px; background: #fff; border-top: 2px solid var(--line); display: flex; justify-content: center; }
+  .zoo-foot button { width: min(360px, 100%); }
+  #keypad button.ok.pulse { animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(47,179,90,0.4); background: #3fcf6c; } }
+
+  #toast { position: absolute; left: 50%; top: calc(72px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 10;
+    background: rgba(40,30,70,0.9); color: #fff; padding: 10px 16px; border-radius: 14px; max-width: 92vw; text-align: center; font-size: 0.95em; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--muted); z-index: 20; }
+
+  /* Широкий экран и телефон боком: поляна слева, пример и клавиатура справа */
+  @media (min-aspect-ratio: 5/4) {
+    #play-body { flex-direction: row; }
+    #meadow-box { flex: 1 1 auto; min-height: 0; }
+    #panel { width: min(460px, 46vw); justify-content: center; overflow-y: auto; border-left: 2px solid var(--line); }
+  }
+  @media (min-aspect-ratio: 5/4) and (max-height: 500px) {
+    #play .hud { padding: 4px 10px; }
+    #panel { gap: 4px; padding: 6px 10px; }
+    #problem { font-size: 30px; }
+    #keypad { gap: 5px; }
+    #keypad button { min-height: 40px; font-size: 1.2em; }
+    #hint { font-size: 0.8em; }
+  }
+  /* Низкий экран (телефон боком): окно конца серии целиком без прокрутки */
+  @media (max-height: 500px) {
+    .overlay { padding: 8px; }
+    .card { gap: 6px; padding: 10px 16px; }
+    .card h2 { font-size: 1.2em; }
+    .card button { min-height: 42px; padding: 0.35em 0.8em; }
+    #end-animal { width: 84px; height: 84px; }
+  }
+  @media (max-height: 640px) and (max-aspect-ratio: 5/4) {
+    #meadow-box { min-height: 90px; }
+    #panel { gap: 5px; padding: 6px 10px 8px; }
+    #keypad button { min-height: 44px; }
+  }
+</style>
+
+</head>
+<body>
+<div id="loading">…</div>
+
+<section id="menu" class="screen" hidden>
+  <canvas id="menu-meadow" aria-hidden="true"></canvas>
+  <div class="front">
+    <h1 id="menu-title"></h1>
+    <p id="menu-tagline"></p>
+    <button id="btn-play" class="primary"></button>
+    <div id="menu-topic"></div>
+    <div class="row"><button id="btn-topics"></button><button id="btn-zoo"></button></div>
+    <button id="btn-sound"></button>
+  </div>
+</section>
+
+<section id="topics" class="screen" hidden>
+  <header class="bar"><button class="back" id="topics-back">←</button><h2 id="topics-title"></h2></header>
+  <div class="scroll"><div id="topic-list"></div></div>
+</section>
+
+<section id="zoo" class="screen" hidden>
+  <header class="bar"><button class="back" id="zoo-back">←</button><h2 id="zoo-title"></h2></header>
+  <div class="scroll"><p id="zoo-hint"></p><div id="zoo-list"></div></div>
+  <div class="zoo-foot"><button id="zoo-play" class="primary"></button></div>
+</section>
+
+<section id="play" class="screen" hidden>
+  <header class="hud">
+    <button id="btn-pause" class="back" aria-label="Пауза">❚❚</button>
+    <div class="title"><b id="play-topic"></b><span id="play-level"></span></div>
+    <div id="dots"></div>
+  </header>
+  <div id="play-body">
+    <div id="meadow-box"><canvas id="meadow"></canvas><div id="banner"></div></div>
+    <div id="panel">
+      <div id="problem"></div>
+      <div id="hint"></div>
+      <div id="keypad"></div>
+    </div>
+  </div>
+
+  <div id="ov-pause" class="overlay" hidden><div class="card">
+    <h2 id="p-title"></h2>
+    <button id="p-resume" class="primary"></button>
+    <button id="p-sound"></button><button id="p-topics"></button><button id="p-menu"></button>
+  </div></div>
+  <div id="ov-end" class="overlay" hidden><div class="card">
+    <h2 id="end-title"></h2>
+    <canvas id="end-animal" width="300" height="300"></canvas>
+    <p id="end-result"></p><p id="end-came"></p>
+    <button id="end-more" class="primary"></button>
+    <button id="end-topics"></button>
+    <button id="end-rare" class="ad"></button>
+  </div></div>
+  <div id="ov-gate" class="overlay" hidden><div class="card">
+    <h2 id="gate-title"></h2><p id="gate-body"></p>
+    <button id="gate-yes" class="primary"></button><button id="gate-no"></button>
+  </div></div>
+</section>
+
+<canvas id="fx"></canvas>
+<div id="toast" hidden></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
