@@ -2,7 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="build" content="2026-10-21T11:06:39.021Z">
+<meta name="journal" content="https://bron.xn----7sbafodk6czaf7a6g.xn--p1ai/igry/j">
+<meta name="build" content="2026-10-22T20:05:42.464Z">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Счётный зоопарк</title>
 <link rel="icon" href="data:,">
@@ -41,6 +42,7 @@
   #menu h1 { margin: 0 0 2px; font-size: clamp(30px, 8vmin, 54px); color: #fff; text-shadow: 0 3px 0 #e9732a, 0 6px 14px rgba(0,0,0,0.25); }
   #menu p { margin: 0 0 6px; color: #234; font-weight: 600; background: rgba(255,255,255,0.75); border-radius: 12px; padding: 6px 10px; }
   #btn-play { font-size: 1.35em; min-height: 62px; }
+  #menu-note { margin: 0; font-size: 0.8em; color: var(--muted); }
   #menu-topic { margin-top: -4px; color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
   #menu .row { display: flex; gap: 10px; }
   #menu .row button { flex: 1; }
@@ -95,8 +97,11 @@
   #hint.bad { color: var(--bad); font-weight: 700; }
   #keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(380px, 100%); }
   #keypad button { min-height: clamp(48px, 7.5vh, 66px); font-size: 1.5em; background: var(--key); border-color: var(--key-hi); color: var(--key-text); padding: 0; }
-  #keypad button.ok { background: var(--ok); border-color: #26984b; color: #fff; font-size: 1.15em; }
+  #keypad button.zero { grid-column: span 2; }
   #keypad button.del { font-size: 1.15em; }
+  /* Знаки действий разными цветами (синий и оранжевый различимы и при дальтонизме) */
+  .sg-plus { color: #1c6fd1; } .sg-minus { color: #e8590c; } .sg-mul { color: #7048e8; } .sg-div { color: #0c8599; }
+  .col .op { font-weight: 900; }
   #banner { position: absolute; left: 50%; top: 18%; transform: translate(-50%, 0) scale(0.6); opacity: 0; pointer-events: none; z-index: 4;
     font-size: clamp(22px, 6vmin, 40px); font-weight: 800; color: #fff; background: #9b6bff; padding: 8px 18px; border-radius: 18px; white-space: nowrap;
     box-shadow: 0 6px 0 #7b4fe0, 0 10px 24px rgba(0,0,0,0.2); transition: opacity 0.25s, transform 0.35s cubic-bezier(.3,1.6,.5,1); max-width: 94vw; overflow: hidden; text-overflow: ellipsis; }
@@ -109,6 +114,9 @@
     display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 34px rgba(0,0,0,0.25); }
   .card h2 { margin: 0; font-size: 1.5em; }
   .card p { margin: 0; color: var(--muted); }
+  #end-result { color: var(--text); font-weight: 700; }
+  /* окно открыто — конфетти летит под затемнением, текст карточки не перекрывает */
+  body.ov-open #fx { z-index: 5; }
   #end-animal { align-self: center; width: 150px; height: 150px; }
 
   /* Зоопарк */
@@ -121,8 +129,6 @@
   .zoo-note { color: var(--muted); font-size: 0.85em; margin: -4px 0 6px; }
   .zoo-foot { padding: 8px 14px 12px; background: #fff; border-top: 2px solid var(--line); display: flex; justify-content: center; }
   .zoo-foot button { width: min(360px, 100%); }
-  #keypad button.ok.pulse { animation: pulse 1s infinite; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(47,179,90,0.4); background: #3fcf6c; } }
 
   #toast { position: absolute; left: 50%; top: calc(72px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 10;
     background: rgba(40,30,70,0.9); color: #fff; padding: 10px 16px; border-radius: 14px; max-width: 92vw; text-align: center; font-size: 0.95em; }
@@ -157,7 +163,7 @@
     #keypad button { min-height: 44px; }
   }
 </style>
-
+<script src="/sdk.js"></script>
 </head>
 <body>
 <div id="loading">…</div>
@@ -171,6 +177,7 @@
     <div id="menu-topic"></div>
     <div class="row"><button id="btn-topics"></button><button id="btn-zoo"></button></div>
     <button id="btn-sound"></button>
+    <p id="menu-note" hidden></p>
   </div>
 </section>
 

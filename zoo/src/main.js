@@ -5,14 +5,18 @@ import { createMeadow, createFx } from './render.js';
 import { texts } from './i18n.js';
 import { initPlatform } from '../platform/ysdk.js';
 import { createAudio } from '../platform/audio.js';
+import { createJournal } from '../platform/journal.js';
 
 const SAVE_KEY = 'zoo-v1';
 const ADS_FROM_SERIES = 2;        // межсерийная реклама — начиная со 2-й законченной серии
 const NEXT_DELAY = 750;           // пауза после верного ответа, чтобы увидеть зверя
 const REVEAL_DELAY = 2200;        // после второй ошибки — показать ответ и идти дальше
+const AUTO_CHECK = 250;           // набраны все цифры ответа — проверка сама, без кнопки ✓ (просьба тестера 22.10)
+const WRONG_LOCK = 400;           // после ошибки нажатия чуть придерживаем, чтобы лишняя цифра не ушла в новый ответ
 
 const $ = (id) => document.getElementById(id);
 const audio = createAudio();
+const J = createJournal({ game: 'zoo' }); // обезличенный журнал ходов; пишет только в тестовой сборке
 let T = texts('ru');
 let platform;
 let data = emptySave();
@@ -41,6 +45,7 @@ const SND = {
 // ---------- экраны ----------
 function show(name) {
   screen = name;
+  J.log('scr', { s: name });
   $('toast').hidden = true; // сообщение с прошлого экрана не переезжает на новый
   if (name !== 'play') fx.clear();
   for (const s of ['menu', 'topics', 'zoo', 'play']) $(s).hidden = s !== name;
@@ -51,14 +56,18 @@ function show(name) {
 }
 function openOverlay(name) {
   overlay = name;
+  J.log('ov', { s: name });
   $('toast').hidden = true;
   for (const o of ['ov-pause', 'ov-end', 'ov-gate']) $(o).hidden = o !== `ov-${name}`;
+  document.body.classList.add('ov-open');
   updatePlaying();
   $(`ov-${name}`)?.querySelector('button')?.focus({ preventScroll: true });
 }
 function closeOverlay() {
+  if (overlay) J.log('ov', { s: '' });
   overlay = null;
   for (const o of ['ov-pause', 'ov-end', 'ov-gate']) $(o).hidden = true;
+  document.body.classList.remove('ov-open');
   updatePlaying();
 }
 // Геймплей идёт только при решении примеров без открытых окон (разметка геймплея площадки).
@@ -92,6 +101,8 @@ function toggleSound() { data.sound = !data.sound; audio.setMuted(!data.sound); 
 function renderMenu() {
   $('menu-title').textContent = T.name;
   $('menu-tagline').textContent = T.tagline;
+  // Тестовая копия с журналом партий — тестер видит, что ходы записываются
+  if (J.enabled) { $('menu-note').textContent = T.journalNote; $('menu-note').hidden = false; }
   $('btn-play').textContent = T.play;
   const tp = data.lastTopic || 'add10';
   $('menu-topic').textContent = `${T.topicNames[tp]} · ${T.topicSample[tp]}`;
@@ -155,10 +166,9 @@ function startSeries(id) {
   data.lastTopic = id;
   rareTaken = false;
   seriesStats = { ok: 0, bad: 0 };
-  session = createSession({
-    topic: id, level: data.levels[id] ?? 0, seed: (Math.random() * 2 ** 31) >>> 0,
-    species: BY_TIER, owned: data.owned,
-  });
+  const params = { topic: id, level: data.levels[id] ?? 0, seed: (Math.random() * 2 ** 31) >>> 0, owned: [...data.owned] };
+  session = createSession({ ...params, species: BY_TIER });
+  J.log('ser', params); // по зерну, уровню и открытым зверям серия проигрывается движком заново
   closeOverlay();
   show('play');
   meadowPlay.setAnimals(data.meadow);
@@ -186,10 +196,17 @@ function nextProblem() {
   $('play-level').textContent = `${'★'.repeat(session.state.level + 1)}${'☆'.repeat(2 - session.state.level)}`;
   $('problem').className = '';
   setHint('');
+  shownAt = performance.now();
+  const p = session.state.problem;
+  J.log('pb', { k: p.key, ans: p.answer });
   renderProblem();
 }
+let shownAt = 0;
 
 function setHint(text, bad = false) { const h = $('hint'); h.textContent = text; h.classList.toggle('bad', bad); }
+
+// Знаки разного цвета: плюс и минус легко перепутать, когда тема меняет действие (отзыв тестера 22.10).
+const OP_CLASS = { '+': 'sg-plus', '-': 'sg-minus', '×': 'sg-mul', '÷': 'sg-div' };
 
 // Пример строкой: «7 + ▢ = 12», или столбиком — ответ пишется справа налево, с единиц.
 function renderProblem(shown = null) {
@@ -209,7 +226,7 @@ function renderProblem(shown = null) {
     };
     const top = row(String(p.a));
     const mid = row(String(p.b));
-    const op = document.createElement('span'); op.className = 'op'; op.textContent = p.op === '-' ? '−' : p.op;
+    const op = document.createElement('span'); op.className = `op ${OP_CLASS[p.op]}`; op.textContent = p.op === '-' ? '−' : p.op;
     mid.prepend(op);
     const line = document.createElement('div'); line.className = 'line';
     const ans = document.createElement('div');
@@ -225,7 +242,7 @@ function renderProblem(shown = null) {
     }
     col.append(top, mid, line, ans);
     box.append(col);
-    if (!value && shown === null) setHint(T.columnHint);
+    if (!value && shown === null) setHint(T.columnHint(p.op));
     return;
   }
   const part = (k, v) => {
@@ -233,36 +250,38 @@ function renderProblem(shown = null) {
     if (p.missing === k) { s.className = 'box' + (value ? ' filled' : ''); s.textContent = value || '?'; } else s.textContent = v;
     return s;
   };
-  const first = shown === null && isFirstTime();
-  if (first && !value) setHint(T.firstHint);
-  $('keypad').querySelector('[data-key="ok"]')?.classList.toggle('pulse', first && !!value);
+  if (shown === null && isFirstTime() && !value) setHint(T.firstHint);
   const sign = { '+': '+', '-': '−', '×': '×', '÷': '÷' }[p.op];
   const eq = document.createElement('span'); eq.textContent = '=';
-  const opEl = document.createElement('span'); opEl.textContent = sign;
+  const opEl = document.createElement('span'); opEl.textContent = sign; opEl.className = OP_CLASS[p.op];
   box.append(part('a', p.a), opEl, part('b', p.b), eq, part('r', p.r));
 }
 
 function press(key) {
   if (screen !== 'play' || overlay || busy || !session || session.state.done) return;
   const p = session.state.problem;
-  if (key === 'del') { typed = p.layout === 'column' ? typed.slice(1) : typed.slice(0, -1); SND.key(); renderProblem(); return; }
-  if (key === 'ok') { if (typed) submit(); return; }
+  if (key === 'del') { typed = p.layout === 'column' ? typed.slice(1) : typed.slice(0, -1); J.log('k', { k: 'del' }); SND.key(); renderProblem(); return; }
+  if (key === 'ok') { if (typed) submit(); return; } // Enter на клавиатуре ПК — проверить раньше
   if (!/^\d$/.test(key)) return;
   if (typed.length >= maxDigits(p)) return;
   // столбиком цифры встают справа налево: сначала единицы
   typed = p.layout === 'column' ? key + typed : (typed === '0' ? key : typed + key);
+  J.log('k', { k: key });
   SND.key();
   renderProblem();
+  // Цифр столько же, сколько в ответе, — проверяем сами; небольшая пауза, чтобы ребёнок увидел набранное.
+  if (typed.length >= String(p.answer).length) { busy = true; setTimeout(submit, AUTO_CHECK); }
 }
 
 function buildKeypad() {
   const box = $('keypad');
   box.textContent = '';
-  for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok']) {
+  // Кнопки ✓ нет: ответ проверяется сам, когда набраны все цифры. Ноль — широкий, «стереть» — справа.
+  for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'del']) {
     const b = document.createElement('button');
     b.dataset.key = k;
     if (k === 'del') { b.className = 'del'; b.textContent = '⌫'; b.setAttribute('aria-label', T.keyDel); }
-    else if (k === 'ok') { b.className = 'ok'; b.textContent = '✓'; b.setAttribute('aria-label', T.keyOk); }
+    else if (k === '0') { b.className = 'zero'; b.textContent = k; }
     else b.textContent = k;
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); press(k); });
     box.append(b);
@@ -292,6 +311,7 @@ function submit() {
   busy = true;
   const res = session.answer(typed);
   if (!res) { busy = false; return; }
+  J.log('ans', { v: typed, ok: res.ok ? 1 : 0, ms: Math.round(performance.now() - shownAt), ...(res.levelChange ? { lc: res.levelChange } : {}) });
   const st = (data.stats[topic] ||= { ok: 0, bad: 0 });
   if (res.ok) {
     st.ok++; seriesStats.ok++;
@@ -338,11 +358,12 @@ function submit() {
   typed = '';
   renderProblem();
   setHint(hintFor(res.problem), true);
-  busy = false;
+  setTimeout(() => { busy = false; }, WRONG_LOCK);
 }
 
 function endSeries() {
   data.series++;
+  J.log('end', { ok: seriesStats.ok, bad: seriesStats.bad, n: data.series });
   save();
   const last = data.meadow[data.meadow.length - 1];
   $('end-title').textContent = T.seriesDone;
@@ -366,14 +387,16 @@ function drawEndAnimal(id) {
 
 // Межсерийная реклама: не во время решения, только между сериями и не на первых сериях.
 async function betweenSeries(then) {
-  if (data.series >= ADS_FROM_SERIES) await platform.showInterstitial();
+  if (data.series >= ADS_FROM_SERIES) { J.log('ad', { w: 'inter' }); await platform.showInterstitial(); }
   then();
 }
 
 async function callRare() {
   const btn = $('end-rare');
   btn.disabled = true;
+  J.log('ad', { w: 'rewarded' });
   const res = await platform.showRewarded();
+  J.log('ad', { w: res.rewarded ? 'got' : res.error ? 'err' : 'skip' });
   btn.disabled = false;
   if (!res.rewarded) { toast(res.error ? T.adFail : T.adNoReward); return; }
   rareTaken = true;
@@ -432,9 +455,10 @@ function bind() {
     $('gate-title').textContent = T.adGateTitle; $('gate-body').textContent = T.adGateBody;
     $('gate-yes').textContent = T.adGateYes; $('gate-no').textContent = T.adGateNo;
     clearCelebration(); // салют не мешает читать взрослому
+    J.log('ad', { w: 'gate' });
     $('ov-gate').hidden = false; $('gate-no').focus({ preventScroll: true });
   };
-  $('gate-no').onclick = () => { $('ov-gate').hidden = true; };
+  $('gate-no').onclick = () => { $('ov-gate').hidden = true; J.log('ad', { w: 'no' }); };
   $('gate-yes').onclick = () => { $('ov-gate').hidden = true; callRare(); };
   document.addEventListener('pointerdown', () => audio.unlock(), { capture: true });
   document.addEventListener('keydown', (e) => {
@@ -461,6 +485,7 @@ async function start() {
   document.documentElement.lang = platform.lang;
   document.title = T.name;
   data = await platform.load(mergeSaves);
+  J.log('open', { lang: platform.lang, w: innerWidth, h: innerHeight, touch: navigator.maxTouchPoints > 0 ? 1 : 0, series: data.series, owned: data.owned.length });
   data.owned = data.owned.filter((id) => SPECIES[id]);
   data.meadow = data.meadow.filter((id) => SPECIES[id]);
   audio.setMuted(!data.sound);

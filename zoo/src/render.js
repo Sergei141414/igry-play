@@ -99,7 +99,7 @@ export function createMeadow(cv) {
     if (!list.length && emptyText) {
       ctx.font = '700 17px system-ui, sans-serif'; ctx.textAlign = 'center';
       const ty = ground() + (H - ground()) / 2;
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(30,80,30,0.8)'; ctx.strokeText(emptyText, W / 2, ty);
+      ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(30,80,30,0.8)'; ctx.strokeText(emptyText, W / 2, ty);
       ctx.fillStyle = '#ffffff'; ctx.fillText(emptyText, W / 2, ty);
     }
   }
