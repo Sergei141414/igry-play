@@ -1,7 +1,7 @@
 // Поляна со зверятами и праздничные эффекты (конфетти, салют, сердечки). Всё рисуется кодом.
 import { SPECIES, TIER_SCALE, drawAnimal } from './animals.js';
 
-const fit = (cv) => {
+export const fit = (cv) => {
   const r = cv.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));

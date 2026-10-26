@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="journal" content="https://bron.xn----7sbafodk6czaf7a6g.xn--p1ai/igry/j">
-<meta name="build" content="2026-10-22T20:05:42.464Z">
+<meta name="build" content="2026-10-26T13:21:05.221Z">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Счётный зоопарк</title>
 <link rel="icon" href="data:,">
@@ -35,17 +35,35 @@
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   canvas { display: block; }
 
-  /* Меню: поляна во весь экран, кнопки поверх */
-  #menu { justify-content: flex-end; }
-  #menu-meadow { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #menu .front { position: relative; margin: auto auto 6vh; width: min(360px, 88vw); display: flex; flex-direction: column; gap: 10px; text-align: center; }
-  #menu h1 { margin: 0 0 2px; font-size: clamp(30px, 8vmin, 54px); color: #fff; text-shadow: 0 3px 0 #e9732a, 0 6px 14px rgba(0,0,0,0.25); }
-  #menu p { margin: 0 0 6px; color: #234; font-weight: 600; background: rgba(255,255,255,0.75); border-radius: 12px; padding: 6px 10px; }
-  #btn-play { font-size: 1.35em; min-height: 62px; }
+  /* Меню (вариант В, 26.10): солнечные лучи, крупный зверь-ведущий с примером, кнопки на белой панели */
+  #menu { --ink: #3b2a8f; color: var(--ink); padding-bottom: 0;
+    background: repeating-conic-gradient(from 4deg at 50% 40%, #ffd23f 0 9deg, #ffc61a 9deg 18deg); }
+  #menu .head { padding: 16px 16px 0; text-align: center; }
+  #menu h1 { margin: 0; font-size: clamp(28px, 7.5vmin, 46px); letter-spacing: -0.5px; }
+  #menu-tagline { margin: 4px 0 0; font-weight: 700; font-size: clamp(15px, 4.2vmin, 19px); }
+  #menu .hero { position: relative; flex: 1; min-height: 110px; }
+  #menu-hero { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+  #menu-bubble { position: absolute; right: max(12px, calc(50% - 190px)); top: 5%; padding: 8px 16px 10px; border-radius: 24px; background: #fff;
+    font-weight: 800; font-size: clamp(26px, 7.5vmin, 42px); letter-spacing: -1px; white-space: nowrap; box-shadow: 0 5px 0 rgba(59,42,143,0.18); pointer-events: none; }
+  #menu-bubble::after { content: ""; position: absolute; left: 22px; bottom: -18px; border: 12px solid transparent; border-top: 14px solid #fff; border-left-width: 4px; transform: skewX(18deg); }
+  #menu-bubble i { font-style: normal; color: #e8650f; }
+  #menu .front { width: min(460px, 100%); margin: 0 auto; padding: 20px 18px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px;
+    text-align: center; background: #fff; border-radius: 28px 28px 0 0; box-shadow: 0 -6px 0 rgba(59,42,143,0.12); }
+  #menu .front button { color: var(--ink); background: var(--key); border-color: #e0d4ff; box-shadow: 0 5px 0 #cbbcf2; }
+  #menu .front #btn-play { font-size: 1.6em; min-height: 70px; color: #fff; background: #e8650f; border-color: #c4530a; box-shadow: 0 6px 0 #b04a08; }
+  #menu-topic { margin-top: -2px; font-weight: 700; }
   #menu-note { margin: 0; font-size: 0.8em; color: var(--muted); }
-  #menu-topic { margin-top: -4px; color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
   #menu .row { display: flex; gap: 10px; }
   #menu .row button { flex: 1; }
+  #btn-zoo { display: flex; align-items: center; justify-content: center; gap: 6px; padding-left: 0.5em; padding-right: 0.5em; }
+  #menu-next { width: 30px; height: 34px; flex: none; }
+  /* Широкий экран: зверь слева, панель кнопок карточкой справа */
+  @media (min-aspect-ratio: 5/4) {
+    #menu { display: grid; grid-template-columns: 1fr minmax(300px, 400px); grid-template-rows: auto 1fr; padding-bottom: env(safe-area-inset-bottom); }
+    #menu .head { grid-column: 1; }
+    #menu .hero { grid-column: 1; }
+    #menu .front { grid-column: 2; grid-row: 1 / 3; align-self: center; width: auto; margin: 12px 20px 12px 0; padding: 18px; border-radius: 28px; box-shadow: 0 6px 0 rgba(59,42,143,0.12); }
+  }
 
   header.bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border-bottom: 2px solid var(--line); }
   header.bar h2 { margin: 0; font-size: 1.15em; flex: 1; min-width: 0; }
@@ -169,13 +187,12 @@
 <div id="loading">…</div>
 
 <section id="menu" class="screen" hidden>
-  <canvas id="menu-meadow" aria-hidden="true"></canvas>
+  <div class="head"><h1 id="menu-title"></h1><p id="menu-tagline"></p></div>
+  <div class="hero"><canvas id="menu-hero" aria-hidden="true"></canvas><div id="menu-bubble" aria-hidden="true"></div></div>
   <div class="front">
-    <h1 id="menu-title"></h1>
-    <p id="menu-tagline"></p>
     <button id="btn-play" class="primary"></button>
     <div id="menu-topic"></div>
-    <div class="row"><button id="btn-topics"></button><button id="btn-zoo"></button></div>
+    <div class="row"><button id="btn-topics"></button><button id="btn-zoo"><canvas id="menu-next" aria-hidden="true"></canvas><span id="btn-zoo-text"></span></button></div>
     <button id="btn-sound"></button>
     <p id="menu-note" hidden></p>
   </div>

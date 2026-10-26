@@ -51,6 +51,18 @@ const outline = (ctx, w) => { ctx.lineWidth = w; ctx.strokeStyle = 'rgba(40,30,4
 export function drawAnimal(ctx, id, x, y, s, { t = 0, dir = 1, happy = 0, silhouette = false } = {}) {
   const sp = SPECIES[id];
   if (!sp) return;
+  // Тень — одним цветом: зверь рисуется отдельно и заливается (filter у холста в Safari не работает)
+  if (silhouette === true) {
+    const off = document.createElement('canvas');
+    off.width = ctx.canvas.width; off.height = ctx.canvas.height;
+    const o = off.getContext('2d');
+    o.setTransform(ctx.getTransform());
+    drawAnimal(o, id, x, y, s, { t, dir, happy, silhouette: 'mask' });
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    o.globalCompositeOperation = 'source-in'; o.fillStyle = '#2d2a3e'; o.fillRect(0, 0, off.width, off.height);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.25; ctx.drawImage(off, 0, 0); ctx.restore();
+    return;
+  }
   const L = sp.look;
   const u = s / 100;                           // 100 условных единиц на высоту зверя
   const breathe = Math.sin(t * 2.2 + x * 0.01) * 1.2;
@@ -58,7 +70,6 @@ export function drawAnimal(ctx, id, x, y, s, { t = 0, dir = 1, happy = 0, silhou
   ctx.save();
   ctx.translate(x, y - hop * u);
   ctx.scale(dir * u, u);
-  if (silhouette) { ctx.globalAlpha = 0.22; ctx.filter = 'brightness(0)'; }
   const lw = 2.2;
   const bodyY = -30, headY = -64 + breathe * 0.3, headR = 27;
 

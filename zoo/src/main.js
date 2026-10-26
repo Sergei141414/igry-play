@@ -1,7 +1,7 @@
 // «Счётный зоопарк»: экраны, ввод ответа, призы, реклама и сохранения.
 import { TOPICS, SERIES_LEN, createSession, maxDigits, emptySave, mergeSaves, addToMeadow } from './engine.js';
 import { SPECIES, BY_TIER, ALL_IDS, drawAnimal } from './animals.js';
-import { createMeadow, createFx } from './render.js';
+import { createMeadow, createFx, fit } from './render.js';
 import { texts } from './i18n.js';
 import { initPlatform } from '../platform/ysdk.js';
 import { createAudio } from '../platform/audio.js';
@@ -31,7 +31,7 @@ let seriesStats = { ok: 0, bad: 0 };
 let endAnimal = null;        // кого показывать в окне конца серии
 
 const meadowPlay = createMeadow($('meadow'));
-const meadowMenu = createMeadow($('menu-meadow'));
+let heroHappy = 0;           // лев-ведущий в меню подпрыгивает от нажатия
 const fx = createFx($('fx'));
 
 // ---------- звук ----------
@@ -107,9 +107,23 @@ function renderMenu() {
   const tp = data.lastTopic || 'add10';
   $('menu-topic').textContent = `${T.topicNames[tp]} · ${T.topicSample[tp]}`;
   $('btn-topics').textContent = T.topics;
-  $('btn-zoo').textContent = T.zoo;
+  $('btn-zoo-text').textContent = T.zoo;
+  $('menu-bubble').textContent = `${T.topicSample[tp]} = `;
+  $('menu-bubble').append(Object.assign(document.createElement('i'), { textContent: '?' }));
   renderSound();
-  meadowMenu.setAnimals(data.meadow);
+  // У «Мой зоопарк» — тень зверька, которого ещё нет: кто придёт следующим
+  const owned = new Set(data.owned);
+  const next = ALL_IDS.find((id) => !owned.has(id));
+  $('menu-next').hidden = !next;
+  if (next) { const { ctx, w, h } = fit($('menu-next')); ctx.clearRect(0, 0, w, h); drawAnimal(ctx, next, w / 2, h - 2, h - 4, { t: 0.4, silhouette: true }); }
+}
+// Ведущий — последний пришедший на поляну зверь, у нового игрока — лев.
+function drawMenuHero(dt) {
+  const { ctx, w, h } = fit($('menu-hero'));
+  ctx.clearRect(0, 0, w, h);
+  heroHappy = Math.max(0, heroHappy - dt);
+  const id = data.meadow.at(-1) || 'lion';
+  drawAnimal(ctx, id, w / 2, h * 0.95, Math.min(h * 0.78, w * 0.72, 380), { t: clock, happy: heroHappy });
 }
 
 function renderTopics() {
@@ -427,7 +441,7 @@ function loop(ts) {
   if (!platform?.isPausedExternally()) {
     clock += dt;
     if (screen === 'play') meadowPlay.frame(clock, dt, T.meadowEmpty);
-    if (screen === 'menu') meadowMenu.frame(clock, dt, '');
+    if (screen === 'menu') drawMenuHero(dt);
     fx.frame(dt);
     if (overlay === 'end') drawEndAnimal(endAnimal);
   }
@@ -437,6 +451,7 @@ function loop(ts) {
 // ---------- кнопки и клавиатура ----------
 function bind() {
   $('btn-play').onclick = () => startSeries(data.lastTopic || 'add10');
+  $('menu-hero').onclick = () => { if (heroHappy < 0.3) { heroHappy = 1.4; SND.pop(); } };
   $('zoo-play').onclick = () => startSeries(data.lastTopic || 'add10');
   $('btn-topics').onclick = () => show('topics');
   $('btn-zoo').onclick = () => show('zoo');
