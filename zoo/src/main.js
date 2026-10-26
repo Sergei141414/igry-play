@@ -9,6 +9,7 @@ import { createJournal } from '../platform/journal.js';
 
 const SAVE_KEY = 'zoo-v1';
 const ADS_FROM_SERIES = 2;        // межсерийная реклама — начиная со 2-й законченной серии
+const NO_ADS = document.querySelector('meta[name="ads"]')?.content === 'off'; // тестовая копия: рекламы нет
 const NEXT_DELAY = 750;           // пауза после верного ответа, чтобы увидеть зверя
 const REVEAL_DELAY = 2200;        // после второй ошибки — показать ответ и идти дальше
 const AUTO_CHECK = 250;           // набраны все цифры ответа — проверка сама, без кнопки ✓ (просьба тестера 22.10)
@@ -387,7 +388,7 @@ function endSeries() {
   $('end-topics').textContent = T.changeTopic;
   $('end-rare').innerHTML = '';
   $('end-rare').append(T.callRare, Object.assign(document.createElement('small'), { textContent: T.callRareSub }));
-  $('end-rare').hidden = rareTaken || data.series < ADS_FROM_SERIES; // реклама — не раньше 2-й серии
+  $('end-rare').hidden = NO_ADS || rareTaken || data.series < ADS_FROM_SERIES; // реклама — не раньше 2-й серии
   endAnimal = last;
   openOverlay('end');
 }
